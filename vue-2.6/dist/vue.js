@@ -3,6 +3,7 @@
  * (c) 2014-2018 Evan You
  * Released under the MIT License.
  */
+// 遵循UMD规范
 (function (global, factory) {
   typeof exports === 'object' && typeof module !== 'undefined' ? module.exports = factory() :
   typeof define === 'function' && define.amd ? define(factory) :
@@ -154,10 +155,10 @@
    * Create a cached version of a pure function.
    */
   function cached (fn) {
-    var cache = Object.create(null);
+    var cache = Object.create(null); // 创建空对象作为缓存对象
     return (function cachedFn (str) {
       var hit = cache[str];
-      return hit || (cache[str] = fn(str))
+      return hit || (cache[str] = fn(str)) // 每次执行时缓存对象有值则不需要执行函数方法，没有则执行并缓存起来
     })
   }
 
@@ -165,7 +166,9 @@
    * Camelize a hyphen-delimited string.
    */
   var camelizeRE = /-(\w)/g;
+  // 每次执行时缓存对象有值则不需要执行函数方法，没有则执行并缓存起来
   var camelize = cached(function (str) {
+    // 将诸如 'a-b'的写法统一处理成驼峰写法'aB'
     return str.replace(camelizeRE, function (_, c) { return c ? c.toUpperCase() : ''; })
   });
 
@@ -231,6 +234,7 @@
   /**
    * Mix properties into target object.
    */
+  // 将_from对象合并到to对象，属性相同时，则覆盖to对象的属性
   function extend (to, _from) {
     for (var key in _from) {
       to[key] = _from[key];
@@ -1256,6 +1260,9 @@
     parentVal,
     childVal
   ) {
+    // 1.如果子类和父类都拥有钩子选项，则将子类选项和父类选项合并,
+    // 2.如果父类不存在钩子选项，子类存在时，则以数组形式返回子类钩子选项，
+    // 3.当子类不存在钩子选项时，则以父类选项返回。
     return childVal
       ? parentVal
         ? parentVal.concat(childVal)
@@ -1266,7 +1273,7 @@
   }
 
   LIFECYCLE_HOOKS.forEach(function (hook) {
-    strats[hook] = mergeHook;
+    strats[hook] = mergeHook; // 对生命周期钩子选项的合并都执行mergeHook策略
   });
 
   /**
@@ -1366,7 +1373,9 @@
   /**
    * Validate component names
    */
+  // components规范检查函数
   function checkComponents (options) {
+    // components规范检查函数
     for (var key in options.components) {
       validateComponentName(key);
     }
@@ -1374,12 +1383,14 @@
 
   function validateComponentName (name) {
     if (!/^[a-zA-Z][\w-]*$/.test(name)) {
+      // 正则判断检测是否为非法的标签，例如数字开头
       warn(
         'Invalid component name: "' + name + '". Component names ' +
         'can only contain alphanumeric characters and the hyphen, ' +
         'and must start with a letter.'
       );
     }
+    // 不能使用Vue自身自定义的组件名，如slot, component,不能使用html的保留标签，如 h1, svg等
     if (isBuiltInTag(name) || config.isReservedTag(name)) {
       warn(
         'Do not use built-in or reserved HTML elements as component ' +
@@ -1392,19 +1403,24 @@
    * Ensure all props option syntax are normalized into the
    * Object-based format.
    */
+  // props规范校验
   function normalizeProps (options, vm) {
     var props = options.props;
     if (!props) { return }
     var res = {};
     var i, val, name;
+    // props选项数据有两种形式，一种是['a', 'b', 'c'],一种是{ a: { type: 'String', default: 'hahah' }}
+    // 数组
     if (Array.isArray(props)) {
       i = props.length;
       while (i--) {
         val = props[i];
         if (typeof val === 'string') {
           name = camelize(val);
+          // 默认将数组形式的props转换为对象形式。
           res[name] = { type: null };
         } else {
+          // 规则：保证是字符串
           warn('props must be strings when using array syntax.');
         }
       }
@@ -1417,6 +1433,7 @@
           : { type: val };
       }
     } else {
+      // 非数组，非对象则判定props选项传递非法
       warn(
         "Invalid value for option \"props\": expected an Array or an Object, " +
         "but got " + (toRawType(props)) + ".",
@@ -1429,15 +1446,19 @@
   /**
    * Normalize all injections into Object-based format
    */
+  // inject的规范化
   function normalizeInject (options, vm) {
     var inject = options.inject;
     if (!inject) { return }
     var normalized = options.inject = {};
+    //数组的形式
     if (Array.isArray(inject)) {
       for (var i = 0; i < inject.length; i++) {
+        // from: 属性是在可用的注入内容中搜索用的 key (字符串或 Symbol)
         normalized[inject[i]] = { from: inject[i] };
       }
     } else if (isPlainObject(inject)) {
+      // 对象的处理
       for (var key in inject) {
         var val = inject[key];
         normalized[key] = isPlainObject(val)
@@ -1445,6 +1466,7 @@
           : { from: val };
       }
     } else {
+      // 非法规则
       warn(
         "Invalid value for option \"inject\": expected an Array or an Object, " +
         "but got " + (toRawType(inject)) + ".",
@@ -1461,6 +1483,7 @@
     if (dirs) {
       for (var key in dirs) {
         var def = dirs[key];
+        // 函数简写同样会转换成对象的形式
         if (typeof def === 'function') {
           dirs[key] = { bind: def, update: def };
         }
@@ -1494,15 +1517,16 @@
     if (typeof child === 'function') {
       child = child.options;
     }
-
+    // props,inject,directives的校验和规范化
     normalizeProps(child, vm);
     normalizeInject(child, vm);
     normalizeDirectives(child);
-    
+
     // Apply extends and mixins on the child options,
     // but only if it is a raw options object that isn't
     // the result of another mergeOptions call.
     // Only merged options has the _base property.
+    // 针对extends扩展的子类构造器
     if (!child._base) {
       if (child.extends) {
         parent = mergeOptions(parent, child.extends, vm);
@@ -1525,7 +1549,9 @@
       }
     }
     function mergeField (key) {
+      // 如果有自定义选项策略，则使用自定义选项策略，否则选择使用默认策略。
       var strat = strats[key] || defaultStrat;
+      // 执行各自的合并策略
       options[key] = strat(parent[key], child[key], vm, key);
     }
     return options
@@ -1912,7 +1938,7 @@
       try {
         return fn.apply(null, arguments)
       } finally {
-        useMacroTask = false;    
+        useMacroTask = false;
       }
     })
   }
@@ -2557,7 +2583,7 @@
 
   function eventsMixin (Vue) {
     var hookRE = /^hook:/;
-    Vue.prototype.$on = function (event, fn) {
+    Vue.prototype.$on = function (event, fn) {// 自定义事件监听
       var vm = this;
       if (Array.isArray(event)) {
         for (var i = 0, l = event.length; i < l; i++) {
@@ -2574,7 +2600,7 @@
       return vm
     };
 
-    Vue.prototype.$once = function (event, fn) {
+    Vue.prototype.$once = function (event, fn) {// 自定义事件监听,只触发一次
       var vm = this;
       function on () {
         vm.$off(event, on);
@@ -2585,7 +2611,7 @@
       return vm
     };
 
-    Vue.prototype.$off = function (event, fn) {
+    Vue.prototype.$off = function (event, fn) {// 自定义事件解绑
       var vm = this;
       // all
       if (!arguments.length) {
@@ -2623,7 +2649,7 @@
       return vm
     };
 
-    Vue.prototype.$emit = function (event) {
+    Vue.prototype.$emit = function (event) {// 自定义事件通知
       var vm = this;
       {
         var lowerCaseEvent = event.toLowerCase();
@@ -4675,6 +4701,7 @@
     Vue.prototype._init = function (options) {
       var vm = this;
       // a uid
+      // 记录实例化多少个vue对象
       vm._uid = uid$3++;
 
       var startTag, endTag;
@@ -4694,8 +4721,9 @@
         // internal component options needs special treatment.
         initInternalComponent(vm, options);
       } else {
+        // 选项合并，将合并后的选项赋值给实例的$options属性
         vm.$options = mergeOptions(
-          resolveConstructorOptions(vm.constructor),
+          resolveConstructorOptions(vm.constructor),// 返回Vue构造函数自身的配置项
           options || {},
           vm
         );
@@ -4803,8 +4831,9 @@
       return latest
     }
   }
-
+  // Vue 构造函数
   function Vue (options) {
+    // 保证了无法直接通过Vue()去调用，只能通过new的方式去创建实例
     if (!(this instanceof Vue)
     ) {
       warn('Vue is a constructor and should be called with the `new` keyword');
@@ -4812,12 +4841,11 @@
     this._init(options);
   }
 
-  initMixin(Vue);
-  stateMixin(Vue);
-  eventsMixin(Vue);
-  lifecycleMixin(Vue);
-  renderMixin(Vue);
-
+  initMixin(Vue); // 定义Vue原型上的init方法(内部方法)
+  stateMixin(Vue); // 定义原型上跟数据相关的属性方法
+  eventsMixin(Vue); //定义原型上跟事件相关的属性方法
+  lifecycleMixin(Vue); // 定义原型上跟生命周期相关的方法
+  renderMixin(Vue); // 定义渲染相关的函数
   /*  */
 
   function initUse (Vue) {
@@ -4874,15 +4902,16 @@
 
       var name = extendOptions.name || Super.options.name;
       if (name) {
-        validateComponentName(name);
+        validateComponentName(name); // 校验子类的名称是否符合规范
       }
-
+      // 创建子类构造器
       var Sub = function VueComponent (options) {
         this._init(options);
       };
-      Sub.prototype = Object.create(Super.prototype);
+      Sub.prototype = Object.create(Super.prototype); // 创建子类构造器
       Sub.prototype.constructor = Sub;
       Sub.cid = cid++;
+      // 子类和父类构造器的配置选项进行合并
       Sub.options = mergeOptions(
         Super.options,
         extendOptions
@@ -4923,7 +4952,7 @@
 
       // cache constructor
       cachedCtors[SuperId] = Sub;
-      return Sub
+      return Sub // 返回子类构造函数
     };
   }
 
@@ -5102,13 +5131,12 @@
       return vnode || (slot && slot[0])
     }
   };
-
+  // Vue内置组件
   var builtInComponents = {
     KeepAlive: KeepAlive
   };
 
-  /*  */
-
+  /* 初始化构造器的api */
   function initGlobalAPI (Vue) {
     // config
     var configDef = {};
@@ -5120,11 +5148,10 @@
         );
       };
     }
+    // 通过Vue.config拿到配置信息
     Object.defineProperty(Vue, 'config', configDef);
 
-    // exposed util methods.
-    // NOTE: these are not considered part of the public API - avoid relying on
-    // them unless you are aware of the risk.
+    // 通过Vue.config拿到配置信息
     Vue.util = {
       warn: warn,
       extend: extend,
@@ -5135,14 +5162,13 @@
     Vue.set = set;
     Vue.delete = del;
     Vue.nextTick = nextTick;
-
+    // 构造函数的默认选项默认为components,directive,filter, _base
     Vue.options = Object.create(null);
     ASSET_TYPES.forEach(function (type) {
       Vue.options[type + 's'] = Object.create(null);
     });
 
-    // this is used to identify the "base" constructor to extend all plain-object
-    // components with in Weex's multi-instance scenarios.
+    // options里的_base属性存储Vue构造器
     Vue.options._base = Vue;
 
     extend(Vue.options.components, builtInComponents);
@@ -8242,7 +8268,7 @@
       }
     }
   };
-
+  // Vue 内置指令，例如： v-model, v-show
   var platformDirectives = {
     model: directive,
     show: show
@@ -8621,8 +8647,8 @@
   Vue.config.isUnknownElement = isUnknownElement;
 
   // install platform runtime directives & components
-  extend(Vue.options.directives, platformDirectives);
-  extend(Vue.options.components, platformComponents);
+  extend(Vue.options.directives, platformDirectives); // 扩展内置指令
+  extend(Vue.options.components, platformComponents); // 扩展内置组件
 
   // install platform patch function
   Vue.prototype.__patch__ = inBrowser ? patch : noop;
